@@ -1,6 +1,7 @@
 ﻿Imports Outlook = Microsoft.Office.Interop.Outlook
 Imports System.Timers
 Imports System.Text.RegularExpressions
+Imports System.IO
 
 Public Class Form1
     Private notifyIcon As System.Windows.Forms.NotifyIcon
@@ -30,11 +31,99 @@ Public Class Form1
 
         ' Set timer interval
         timer.Interval = TimeSpan.FromSeconds(interval).TotalMilliseconds
+
+        ' Create folders for YYYY\MMM in download path
+        CreateYearMonthFolders()
+    End Sub
+
+    Private Sub CreateYearMonthFolders()
+        Dim currentDate As Date = Date.Now
+        Dim yearFolder As String = Path.Combine(downloadPath, currentDate.ToString("yyyy"))
+        Dim monthFolder As String = Path.Combine(yearFolder, currentDate.ToString("MMM"))
+
+        ' Create year folder if it doesn't exist
+        If Not Directory.Exists(yearFolder) Then
+            Directory.CreateDirectory(yearFolder)
+        End If
+
+        ' Create month folder if it doesn't exist
+        If Not Directory.Exists(monthFolder) Then
+            Directory.CreateDirectory(monthFolder)
+        End If
+
+        ' Initialize additional folders under the month folder
+        Dim additionalFolders As String() = {
+            "Latam De Minimis Calculation",
+            "OPICS Scotia Investments Jamaica Limited",
+            "Supporting Files K2 and Murex",
+            "SCOTS",
+            "Calculations"
+        }
+
+        For Each folderName As String In additionalFolders
+            Dim folderPath As String = Path.Combine(monthFolder, folderName)
+            If Not Directory.Exists(folderPath) Then
+                Directory.CreateDirectory(folderPath)
+            End If
+        Next
+    End Sub
+
+    Private Sub SaveAttachment(attachment As Outlook.Attachment, targetFolder As String)
+        ' Save the attachment to the target folder
+        If Not Directory.Exists(targetFolder) Then
+            Directory.CreateDirectory(targetFolder)
+        End If
+
+        Dim filePath As String = Path.Combine(targetFolder, attachment.FileName)
+        attachment.SaveAsFile(filePath)
     End Sub
 
     Private Sub Timer_Elapsed(sender As Object, e As ElapsedEventArgs)
-        ' Check for new emails
-        Dim inboxFolder As Outlook.Folder = outlookApp.Session.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderInbox)
+        Dim inboxFolder As Outlook.Folder
+        ' Check if outlookApp is initialized
+        If outlookApp Is Nothing Then
+            Try
+                ' Attempt to create a new instance of Outlook
+                outlookApp = CreateObject("Outlook.Application")
+            Catch ex As Exception
+                ' Handle any errors that occur during the creation of Outlook
+                MessageBox.Show("Unable to open Outlook: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return
+            End Try
+
+            ' Check if Outlook was successfully opened
+            If outlookApp Is Nothing Then
+                ' Outlook could not be opened
+                MessageBox.Show("Unable to open Outlook.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return
+            End If
+        End If
+
+        ' Attempt to access Outlook objects with a retry mechanism
+        Dim retryCount As Integer = 0
+        Do
+            Try
+                ' Attempt to access the inbox folder
+                inboxFolder = outlookApp.Session.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderInbox)
+                ' Proceed with checking for new emails
+                Exit Do ' Exit the loop if successful
+            Catch ex As System.Runtime.InteropServices.COMException When ex.ErrorCode = &H8001010A AndAlso retryCount < 10
+                ' The application is busy, so wait for a short time and retry
+                System.Threading.Thread.Sleep(1000) ' Wait for 1 second before retrying
+                retryCount += 1 ' Increment the retry count
+            Catch ex As Exception
+                ' Handle any other exceptions
+                MessageBox.Show("Error accessing Outlook: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return
+            End Try
+        Loop While retryCount < 10 ' Retry a maximum of 10 times
+
+        ' If the loop exits without success after 10 retries, display an error message
+        If retryCount >= 10 Then
+            MessageBox.Show("Unable to access Outlook. Please try again later.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End If
+
         For Each item As Object In inboxFolder.Items
             If TypeOf item Is Outlook.MailItem Then
                 Dim mailItem As Outlook.MailItem = DirectCast(item, Outlook.MailItem)
@@ -57,15 +146,38 @@ Public Class Form1
 
                     ' Display a message box with subject details
                     Dim message As String = $"Email received with subject:{Environment.NewLine}{Environment.NewLine}" &
-                                            $"Prefix: {prefix}{Environment.NewLine}" &
-                                            $"Start Date: {startDate}{Environment.NewLine}" &
-                                            $"End Date: {endDate}"
+                                        $"Prefix: {prefix}{Environment.NewLine}" &
+                                        $"Start Date: {startDate}{Environment.NewLine}" &
+                                        $"End Date: {endDate}"
                     MessageBox.Show(message, "New Email", MessageBoxButtons.OK, MessageBoxIcon.Information)
 
                     ' Download attachments
                     For Each attachment As Outlook.Attachment In mailItem.Attachments
-                        ' Save the attachment to the selected location
-                        attachment.SaveAsFile(System.IO.Path.Combine(downloadPath, attachment.FileName))
+                        ' Define base target folder
+                        Dim currentDate As Date = Date.Now
+                        Dim yearFolder As String = Path.Combine(downloadPath, currentDate.ToString("yyyy"))
+                        Dim monthFolder As String = Path.Combine(yearFolder, currentDate.ToString("MMM"))
+                        Dim targetFolder As String = monthFolder ' Base target folder
+
+                        ' Append subfolders based on conditions
+                        Dim fileName As String = attachment.FileName.ToUpper()
+                        If fileName.Contains("US PERSON") OrElse fileName.Contains("US_PERSON") Then
+                            targetFolder = Path.Combine(targetFolder, "Latam De Minimis Calculation", "CFTC Deminimis LatAm Extracts", "US Person List")
+                        ElseIf fileName.StartsWith("CARTERA") OrElse
+                           fileName.StartsWith("DEMINIMISREPORT") OrElse
+                           fileName.StartsWith("DERIVATIVES") OrElse
+                           fileName.StartsWith("DODD-FRANK") OrElse
+                           fileName.StartsWith("MINIMIS CALCULATION TEMPLATE") Then
+                            targetFolder = Path.Combine(targetFolder, "Latam De Minimis Calculation", "CFTC Deminimis LatAm Extracts")
+                        ElseIf fileName.StartsWith("FX") OrElse
+                           fileName.StartsWith("FOREX") Then
+                            targetFolder = Path.Combine(targetFolder, "OPICS Scotia Investments Jamaica Limited")
+                        ElseIf fileName.Contains("DF_DEMINIMIS_EXTRACT") Then
+                            targetFolder = Path.Combine(targetFolder, "Supporting Files K2 and Murex", "Murex")
+                        End If
+
+                        ' Save attachment to the target folder
+                        SaveAttachment(attachment, targetFolder)
                     Next
 
                     ' Optionally, you can mark the email as read once processed
@@ -75,11 +187,9 @@ Public Class Form1
 
                 End If
 
-
             End If
         Next
     End Sub
-
 
     Private Sub btnSelectDownloadPath_Click(sender As Object, e As EventArgs) Handles btnSelectDownloadPath.Click
         ' Open folder browser dialog to select download location
@@ -91,6 +201,7 @@ Public Class Form1
             ' Save download path to settings
             My.Settings.DownloadPath = downloadPath
             My.Settings.Save()
+            CreateYearMonthFolders()
         End If
     End Sub
 
