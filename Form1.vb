@@ -39,7 +39,7 @@ Public Class Form1
     Private Sub CreateYearMonthFolders()
         Dim currentDate As Date = Date.Now
         Dim yearFolder As String = Path.Combine(downloadPath, currentDate.ToString("yyyy"))
-        Dim monthFolder As String = Path.Combine(yearFolder, currentDate.ToString("MMM"))
+        Dim prevMonthFolder As String = Path.Combine(yearFolder, currentDate.AddMonths(-1).ToString("MMM"))
 
         ' Create year folder if it doesn't exist
         If Not Directory.Exists(yearFolder) Then
@@ -47,8 +47,8 @@ Public Class Form1
         End If
 
         ' Create month folder if it doesn't exist
-        If Not Directory.Exists(monthFolder) Then
-            Directory.CreateDirectory(monthFolder)
+        If Not Directory.Exists(prevMonthFolder) Then
+            Directory.CreateDirectory(prevMonthFolder)
         End If
 
         ' Initialize additional folders under the month folder
@@ -61,7 +61,7 @@ Public Class Form1
         }
 
         For Each folderName As String In additionalFolders
-            Dim folderPath As String = Path.Combine(monthFolder, folderName)
+            Dim folderPath As String = Path.Combine(prevMonthFolder, folderName)
             If Not Directory.Exists(folderPath) Then
                 Directory.CreateDirectory(folderPath)
             End If
@@ -156,8 +156,8 @@ Public Class Form1
                         ' Define base target folder
                         Dim currentDate As Date = Date.Now
                         Dim yearFolder As String = Path.Combine(downloadPath, currentDate.ToString("yyyy"))
-                        Dim monthFolder As String = Path.Combine(yearFolder, currentDate.ToString("MMM"))
-                        Dim targetFolder As String = monthFolder ' Base target folder
+                        Dim prevMonthFolder As String = Path.Combine(yearFolder, currentDate.ToString("MMM"))
+                        Dim targetFolder As String = prevMonthFolder ' Base target folder
 
                         ' Append subfolders based on conditions
                         Dim fileName As String = attachment.FileName.ToUpper()
