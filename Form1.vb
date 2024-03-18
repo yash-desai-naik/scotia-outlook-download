@@ -9,10 +9,13 @@ Public Class Form1
     Private WithEvents timer As New Timer()
     Private outlookApp As Outlook.Application
     Private downloadPath As String = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+
     Private interval As Integer
 
     Public Sub New()
         InitializeComponent()
+
+        EnsureCreation(downloadPath)
 
         ' Initialize timer
         timer.Enabled = True
@@ -25,6 +28,7 @@ Public Class Form1
         interval = My.Settings.Interval
 
         downloadPath = Path.Combine(downloadPath, "scotia-automation")
+        EnsureCreation(downloadPath)
 
         ' Update UI with settings
         ToolStripStatusLabel1.Text = downloadPath
@@ -42,15 +46,15 @@ Public Class Form1
         Dim yearFolder As String = Path.Combine(downloadPath, currentDate.ToString("yyyy"))
         Dim prevMonthFolder As String = Path.Combine(yearFolder, currentDate.AddMonths(-1).ToString("MMM"))
 
-        ' Create year folder if it doesn't exist
-        If Not Directory.Exists(yearFolder) Then
-            Directory.CreateDirectory(yearFolder)
-        End If
+        '' Create year folder if it doesn't exist
+        'If Not Directory.Exists(yearFolder) Then
+        '    Directory.CreateDirectory(yearFolder)
+        'End If
 
-        ' Create month folder if it doesn't exist
-        If Not Directory.Exists(prevMonthFolder) Then
-            Directory.CreateDirectory(prevMonthFolder)
-        End If
+        '' Create month folder if it doesn't exist
+        'If Not Directory.Exists(prevMonthFolder) Then
+        '    Directory.CreateDirectory(prevMonthFolder)
+        'End If
 
         ' Initialize additional folders under the month folder
         Dim additionalFolders As String() = {
@@ -63,19 +67,21 @@ Public Class Form1
 
         For Each folderName As String In additionalFolders
             Dim folderPath As String = Path.Combine(prevMonthFolder, folderName)
-            If Not Directory.Exists(folderPath) Then
-                Directory.CreateDirectory(folderPath)
-            End If
+            'If Not Directory.Exists(folderPath) Then
+            '    Directory.CreateDirectory(folderPath)
+            'End If
+            EnsureCreation(folderPath)
         Next
     End Sub
 
     Private Sub SaveAttachment(attachment As Outlook.Attachment, targetFolder As String)
         ' Save the attachment to the target folder
-        If Not Directory.Exists(targetFolder) Then
-            Directory.CreateDirectory(targetFolder)
-        End If
+        'If Not Directory.Exists(targetFolder) Then
+        '    Directory.CreateDirectory(targetFolder)
+        'End If
 
         Dim filePath As String = Path.Combine(targetFolder, attachment.FileName)
+        'EnsureCreation(filePath, method:="file")
         attachment.SaveAsFile(filePath)
     End Sub
 
@@ -159,22 +165,27 @@ Public Class Form1
                         Dim yearFolder As String = Path.Combine(downloadPath, currentDate.ToString("yyyy"))
                         Dim prevMonthFolder As String = Path.Combine(yearFolder, currentDate.AddMonths(-1).ToString("MMM"))
                         Dim targetFolder As String = prevMonthFolder ' Base target folder
+                        EnsureCreation(targetFolder)
 
                         ' Append subfolders based on conditions
                         Dim fileName As String = attachment.FileName.ToUpper()
                         If fileName.Contains("US PERSON") OrElse fileName.Contains("US_PERSON") Then
                             targetFolder = Path.Combine(targetFolder, "Latam De Minimis Calculation", "CFTC Deminimis LatAm Extracts", "US Person List")
+                            EnsureCreation(targetFolder)
                         ElseIf fileName.StartsWith("CARTERA") OrElse
                            fileName.StartsWith("DEMINIMISREPORT") OrElse
                            fileName.StartsWith("DERIVATIVES") OrElse
                            fileName.StartsWith("DODD-FRANK") OrElse
                            fileName.StartsWith("MINIMIS CALCULATION TEMPLATE") Then
                             targetFolder = Path.Combine(targetFolder, "Latam De Minimis Calculation", "CFTC Deminimis LatAm Extracts")
+                            EnsureCreation(targetFolder)
                         ElseIf fileName.StartsWith("FX") OrElse
                            fileName.StartsWith("FOREX") Then
                             targetFolder = Path.Combine(targetFolder, "OPICS Scotia Investments Jamaica Limited")
+                            EnsureCreation(targetFolder)
                         ElseIf fileName.Contains("DF_DEMINIMIS_EXTRACT") Then
                             targetFolder = Path.Combine(targetFolder, "Supporting Files K2 and Murex", "Murex")
+                            EnsureCreation(targetFolder)
                         End If
 
                         ' Save attachment to the target folder
@@ -244,4 +255,33 @@ Public Class Form1
         ' Exit the application when "Exit" is clicked
         Me.Close()
     End Sub
+
+    Public Function EnsureCreation(path As String, Optional ByVal method As String = "dir") As Boolean
+
+
+        If method = "dir" Then
+            Try
+                If Not Directory.Exists(path) Then
+                    Dim directoryInfo As New DirectoryInfo(path)
+                    directoryInfo.Create() ' Create directory with intermediate directories if needed
+                End If
+                Return True
+            Catch ex As Exception
+                Console.WriteLine($"Error creating directory: {path} ({ex.Message})")
+                Return False
+            End Try
+        ElseIf method = "file" Then
+            Try
+                Dim fileStream As New FileStream(path, FileMode.Create)
+                fileStream.Close() ' Create an empty file
+                Return True
+            Catch ex As Exception
+                Console.WriteLine($"Error creating file: {path} ({ex.Message})")
+                Return False
+            End Try
+        Else
+            Console.WriteLine($"Invalid method: {method}. Supported methods are 'dir' and 'file'.")
+            Return False
+        End If
+    End Function
 End Class
