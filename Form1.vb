@@ -13,48 +13,49 @@ Public Class Form1
     Private interval As Integer
 
     Public Sub New()
-        InitializeComponent()
-
-
-        ' Initialize timer
-        timer.Enabled = True
-        AddHandler timer.Elapsed, AddressOf Timer_Elapsed
-
-        ' Initialize Outlook application
-        outlookApp = New Outlook.Application()
-
-        ' Retrieve  interval from settings
-        interval = My.Settings.Interval
-
-        downloadPath = Path.Combine(downloadPath, "scotia-automation")
-        MsgBox("attempt to create: " & downloadPath)
-        EnsureCreation(downloadPath)
-
         Try
-            MsgBox("CreateYearMonthFolders")
-            ' Create folders for YYYY\MMM in download path
-            CreateYearMonthFolders()
+            InitializeComponent()
+
+
+            ' Initialize timer
+            timer.Enabled = True
+            AddHandler timer.Elapsed, AddressOf Timer_Elapsed
+
+            ' Initialize Outlook application
+            outlookApp = New Outlook.Application()
+
+            ' Retrieve  interval from settings
+            interval = My.Settings.Interval
+
+            downloadPath = Path.Combine(downloadPath, "scotia-automation")
+            EnsureCreation(downloadPath)
+
+            Try
+                ' Create folders for YYYY\MMM in download path
+                CreateYearMonthFolders()
+            Catch ex As Exception
+                MsgBox("Sorr, " & ex.Message)
+            End Try
+
+
+            ' Update UI with settings
+            ToolStripStatusLabel1.Text = downloadPath
+            txtInterval.Text = interval.ToString()
+
+            ' Set timer interval
+            timer.Interval = TimeSpan.FromSeconds(interval).TotalMilliseconds
         Catch ex As Exception
-            MsgBox("Sorr, " & ex.Message)
+            MsgBox("Something wen't wrong while initializing the app")
+
         End Try
 
-
-        ' Update UI with settings
-        ToolStripStatusLabel1.Text = downloadPath
-        txtInterval.Text = interval.ToString()
-
-        ' Set timer interval
-        timer.Interval = TimeSpan.FromSeconds(interval).TotalMilliseconds
     End Sub
 
     Private Sub CreateYearMonthFolders()
-        MsgBox("In CreateYearMonthFolders")
         Dim currentDate As Date = Date.Now
         Dim yearFolder As String = Path.Combine(downloadPath, currentDate.ToString("yyyy"))
-        MsgBox("attempt to create: " & yearFolder)
         EnsureCreation(yearFolder)
         Dim prevMonthFolder As String = Path.Combine(yearFolder, currentDate.AddMonths(-1).ToString("MMM"))
-        MsgBox("attempt to create: " & prevMonthFolder)
         EnsureCreation(prevMonthFolder)
 
         '' Create year folder if it doesn't exist
@@ -81,7 +82,6 @@ Public Class Form1
             'If Not Directory.Exists(folderPath) Then
             '    Directory.CreateDirectory(folderPath)
             'End If
-            MsgBox("attempt to create: " & folderPath)
             EnsureCreation(folderPath)
         Next
     End Sub
@@ -232,16 +232,21 @@ Public Class Form1
     End Sub
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        ' Initialize NotifyIcon
-        notifyIcon = New System.Windows.Forms.NotifyIcon()
-        notifyIcon.Icon = Me.Icon
-        notifyIcon.Text = Me.Text
+        Try
+            ' Initialize NotifyIcon
+            notifyIcon = New System.Windows.Forms.NotifyIcon()
+            notifyIcon.Icon = Me.Icon
+            notifyIcon.Text = Me.Text
 
-        ' Add a context menu to the NotifyIcon (optional)
-        Dim contextMenu As New System.Windows.Forms.ContextMenu()
-        contextMenu.MenuItems.Add("Restore", AddressOf RestoreForm)
-        contextMenu.MenuItems.Add("Exit", AddressOf ExitApplication)
-        notifyIcon.ContextMenu = contextMenu
+            ' Add a context menu to the NotifyIcon (optional)
+            Dim contextMenu As New System.Windows.Forms.ContextMenu()
+            contextMenu.MenuItems.Add("Restore", AddressOf RestoreForm)
+            contextMenu.MenuItems.Add("Exit", AddressOf ExitApplication)
+            notifyIcon.ContextMenu = contextMenu
+        Catch ex As Exception
+            MsgBox("Something wen't wrong while loading the app")
+        End Try
+
     End Sub
 
     Private Sub Form1_Resize(sender As Object, e As EventArgs) Handles Me.Resize
@@ -276,7 +281,6 @@ Public Class Form1
                 If Not Directory.Exists(path) Then
                     Dim directoryInfo As New DirectoryInfo(path)
                     directoryInfo.Create() ' Create directory with intermediate directories if needed
-                    MsgBox("Folder Createed: " & path)
                     Return True
                 End If
             Catch ex As Exception
