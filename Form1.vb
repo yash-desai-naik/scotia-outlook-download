@@ -15,7 +15,6 @@ Public Class Form1
     Public Sub New()
         InitializeComponent()
 
-        EnsureCreation(downloadPath)
 
         ' Initialize timer
         timer.Enabled = True
@@ -28,7 +27,17 @@ Public Class Form1
         interval = My.Settings.Interval
 
         downloadPath = Path.Combine(downloadPath, "scotia-automation")
+        MsgBox("attempt to create: " & downloadPath)
         EnsureCreation(downloadPath)
+
+        Try
+            MsgBox("CreateYearMonthFolders")
+            ' Create folders for YYYY\MMM in download path
+            CreateYearMonthFolders()
+        Catch ex As Exception
+            MsgBox("Sorr, " & ex.Message)
+        End Try
+
 
         ' Update UI with settings
         ToolStripStatusLabel1.Text = downloadPath
@@ -36,15 +45,17 @@ Public Class Form1
 
         ' Set timer interval
         timer.Interval = TimeSpan.FromSeconds(interval).TotalMilliseconds
-
-        ' Create folders for YYYY\MMM in download path
-        CreateYearMonthFolders()
     End Sub
 
     Private Sub CreateYearMonthFolders()
+        MsgBox("In CreateYearMonthFolders")
         Dim currentDate As Date = Date.Now
         Dim yearFolder As String = Path.Combine(downloadPath, currentDate.ToString("yyyy"))
+        MsgBox("attempt to create: " & yearFolder)
+        EnsureCreation(yearFolder)
         Dim prevMonthFolder As String = Path.Combine(yearFolder, currentDate.AddMonths(-1).ToString("MMM"))
+        MsgBox("attempt to create: " & prevMonthFolder)
+        EnsureCreation(prevMonthFolder)
 
         '' Create year folder if it doesn't exist
         'If Not Directory.Exists(yearFolder) Then
@@ -70,6 +81,7 @@ Public Class Form1
             'If Not Directory.Exists(folderPath) Then
             '    Directory.CreateDirectory(folderPath)
             'End If
+            MsgBox("attempt to create: " & folderPath)
             EnsureCreation(folderPath)
         Next
     End Sub
@@ -264,8 +276,9 @@ Public Class Form1
                 If Not Directory.Exists(path) Then
                     Dim directoryInfo As New DirectoryInfo(path)
                     directoryInfo.Create() ' Create directory with intermediate directories if needed
+                    MsgBox("Folder Createed: " & path)
+                    Return True
                 End If
-                Return True
             Catch ex As Exception
                 Console.WriteLine($"Error creating directory: {path} ({ex.Message})")
                 Return False
