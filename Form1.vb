@@ -8,7 +8,7 @@ Public Class Form1
 
     Private WithEvents timer As New Timer()
     Private outlookApp As Outlook.Application
-    Private downloadPath As String
+    Private downloadPath As String = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
     Private interval As Integer
 
     Public Sub New()
@@ -21,9 +21,10 @@ Public Class Form1
         ' Initialize Outlook application
         outlookApp = New Outlook.Application()
 
-        ' Retrieve download path and interval from settings
-        downloadPath = My.Settings.DownloadPath
+        ' Retrieve  interval from settings
         interval = My.Settings.Interval
+
+        downloadPath = Path.Combine(downloadPath, "scotia-automation")
 
         ' Update UI with settings
         ToolStripStatusLabel1.Text = downloadPath
@@ -156,7 +157,7 @@ Public Class Form1
                         ' Define base target folder
                         Dim currentDate As Date = Date.Now
                         Dim yearFolder As String = Path.Combine(downloadPath, currentDate.ToString("yyyy"))
-                        Dim prevMonthFolder As String = Path.Combine(yearFolder, currentDate.ToString("MMM"))
+                        Dim prevMonthFolder As String = Path.Combine(yearFolder, currentDate.AddMonths(-1).ToString("MMM"))
                         Dim targetFolder As String = prevMonthFolder ' Base target folder
 
                         ' Append subfolders based on conditions
@@ -191,19 +192,7 @@ Public Class Form1
         Next
     End Sub
 
-    Private Sub btnSelectDownloadPath_Click(sender As Object, e As EventArgs) Handles btnSelectDownloadPath.Click
-        ' Open folder browser dialog to select download location
-        Dim folderBrowserDialog As New FolderBrowserDialog()
-        If folderBrowserDialog.ShowDialog() = DialogResult.OK Then
-            downloadPath = folderBrowserDialog.SelectedPath
-            ToolStripStatusLabel1.Text = downloadPath
 
-            ' Save download path to settings
-            My.Settings.DownloadPath = downloadPath
-            My.Settings.Save()
-            CreateYearMonthFolders()
-        End If
-    End Sub
 
     Private Sub btnUpdateInterval_Click(sender As Object, e As EventArgs) Handles btnUpdateInterval.Click
         ' Update interval based on the value entered in the interval textbox
