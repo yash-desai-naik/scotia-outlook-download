@@ -2,6 +2,7 @@
 Imports System.Timers
 Imports System.Text.RegularExpressions
 Imports System.IO
+Imports Microsoft.Office.Interop.Word
 
 Public Class Form1
     Private notifyIcon As System.Windows.Forms.NotifyIcon
@@ -98,6 +99,12 @@ Public Class Form1
     End Sub
 
     Private Sub Timer_Elapsed(sender As Object, e As ElapsedEventArgs)
+        ' Define base target folder
+        Dim currentDate As Date = Date.Now
+        Dim yearFolder As String = Path.Combine(downloadPath, currentDate.ToString("yyyy"))
+        Dim prevMonthFolder As String = Path.Combine(yearFolder, currentDate.AddMonths(-1).ToString("MMM"))
+        Dim targetFolder As String = prevMonthFolder ' Base target folder
+        EnsureCreation(targetFolder)
         Dim inboxFolder As Outlook.Folder
         ' Check if outlookApp is initialized
         If outlookApp Is Nothing Then
@@ -151,6 +158,8 @@ Public Class Form1
                     Continue For
                 End If
 
+
+
                 ' Define regular expression pattern to match subject
                 Dim pattern As String = "(RE: |RV: )?(?<Prefix>.+?) - Dodd-Frank DeMinimis Extract Request \| (?<StartDate>.+?) - (?<EndDate>.+?)( - SwapOne)?"
 
@@ -170,51 +179,100 @@ Public Class Form1
                                         $"End Date: {endDate}"
                     MessageBox.Show(message, "New Email", MessageBoxButtons.OK, MessageBoxIcon.Information)
 
-                    ' Download attachments
-                    For Each attachment As Outlook.Attachment In mailItem.Attachments
-                        ' Define base target folder
-                        Dim currentDate As Date = Date.Now
-                        Dim yearFolder As String = Path.Combine(downloadPath, currentDate.ToString("yyyy"))
-                        Dim prevMonthFolder As String = Path.Combine(yearFolder, currentDate.AddMonths(-1).ToString("MMM"))
-                        Dim targetFolder As String = prevMonthFolder ' Base target folder
-                        EnsureCreation(targetFolder)
+                    ' Check if there are any attachments
+                    If mailItem.Attachments.Count = 0 Then
+                        ' Save the email as PDF
+                        SaveEmailAsPDF(mailItem, targetFolder)
+                        ' Mark the email as read once processed
+                        mailItem.UnRead = False
+                        ' Save changes
+                        mailItem.Save()
+                        Continue For
+                    Else
 
-                        ' Append subfolders based on conditions
-                        Dim fileName As String = attachment.FileName.ToUpper()
-                        If fileName.Contains("US PERSON") OrElse fileName.Contains("US_PERSON") Then
-                            targetFolder = Path.Combine(targetFolder, "Latam De Minimis Calculation", "CFTC Deminimis LatAm Extracts", "US Person List")
-                            EnsureCreation(targetFolder)
-                        ElseIf fileName.StartsWith("CARTERA") OrElse
+                        ' Download attachments
+                        For Each attachment As Outlook.Attachment In mailItem.Attachments
+
+                            ' Append subfolders based on conditions
+                            Dim fileName As String = attachment.FileName.ToUpper()
+                            If fileName.Contains("US PERSON") OrElse fileName.Contains("US_PERSON") Then
+                                targetFolder = Path.Combine(targetFolder, "Latam De Minimis Calculation", "CFTC Deminimis LatAm Extracts", "US Person List")
+                                EnsureCreation(targetFolder)
+                            ElseIf fileName.StartsWith("CARTERA") OrElse
                            fileName.StartsWith("DEMINIMISREPORT") OrElse
                            fileName.StartsWith("DERIVATIVES") OrElse
                            fileName.StartsWith("DODD-FRANK") OrElse
                            fileName.StartsWith("MINIMIS CALCULATION TEMPLATE") Then
-                            targetFolder = Path.Combine(targetFolder, "Latam De Minimis Calculation", "CFTC Deminimis LatAm Extracts")
-                            EnsureCreation(targetFolder)
-                        ElseIf fileName.StartsWith("FX") OrElse
+                                targetFolder = Path.Combine(targetFolder, "Latam De Minimis Calculation", "CFTC Deminimis LatAm Extracts")
+                                EnsureCreation(targetFolder)
+                            ElseIf fileName.StartsWith("FX") OrElse
                            fileName.StartsWith("FOREX") Then
-                            targetFolder = Path.Combine(targetFolder, "OPICS Scotia Investments Jamaica Limited")
-                            EnsureCreation(targetFolder)
-                        ElseIf fileName.Contains("DF_DEMINIMIS_EXTRACT") Then
-                            targetFolder = Path.Combine(targetFolder, "Supporting Files K2 and Murex", "Murex")
-                            EnsureCreation(targetFolder)
-                        End If
+                                targetFolder = Path.Combine(targetFolder, "OPICS Scotia Investments Jamaica Limited")
+                                EnsureCreation(targetFolder)
+                            ElseIf fileName.Contains("DF_DEMINIMIS_EXTRACT") Then
+                                targetFolder = Path.Combine(targetFolder, "Supporting Files K2 and Murex", "Murex")
+                                EnsureCreation(targetFolder)
+                            End If
 
-                        ' Save attachment to the target folder
-                        SaveAttachment(attachment, targetFolder)
-                    Next
+                            ' Save attachment to the target folder
+                            SaveAttachment(attachment, targetFolder)
+                        Next
 
-                    ' Optionally, you can mark the email as read once processed
-                    mailItem.UnRead = False
-                    ' Save changes
-                    mailItem.Save()
+                        ' Optionally, you can mark the email as read once processed
+                        mailItem.UnRead = False
+                        ' Save changes
+                        mailItem.Save()
+                    End If
 
                 End If
 
             End If
         Next
     End Sub
+    Private Function MakeValidFileName(fileName As String) As String
+        ' List of invalid characters in Windows file names
+        Dim invalidChars As Char() = Path.GetInvalidFileNameChars()
 
+        ' Replace invalid characters with underscores
+        For Each invalidChar As Char In invalidChars
+            fileName = fileName.Replace(invalidChar, "_"c)
+        Next
+
+        ' Remove any remaining characters that could cause issues
+        fileName = fileName.Replace(":", "").Replace("|", "").Replace(",", "")
+
+        Return fileName
+    End Function
+
+    Private Sub SaveEmailAsPDF(mailItem As Outlook.MailItem, targetFolder As String)
+        Dim originalFileName As String = $"{mailItem.Subject}.pdf" ' Use the email subject as the PDF file name
+
+        ' Make the file name valid by replacing or removing invalid characters
+        Dim modifiedFileName As String = MakeValidFileName(originalFileName)
+
+        ' Combine the target folder and modified file name to create the full file path
+        Dim filePath As String = Path.Combine(targetFolder, modifiedFileName)
+
+        ' Create a Word application instance
+        Dim wordApp As New Application()
+
+        Try
+            ' Create a new document
+            Dim document As Document = wordApp.Documents.Add()
+            ' Insert the email body into the document
+            document.Content.Text = mailItem.Body
+            ' Save the document as PDF
+            document.SaveAs2(filePath, WdSaveFormat.wdFormatPDF)
+            ' Close the document without saving changes
+            document.Close(SaveChanges:=False)
+        Catch ex As Exception
+            ' Handle any errors that occur during the conversion process
+            MessageBox.Show($"Error converting email to PDF: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            ' Close the Word application instance
+            wordApp.Quit(False)
+        End Try
+    End Sub
 
 
     Private Sub btnUpdateInterval_Click(sender As Object, e As EventArgs) Handles btnUpdateInterval.Click
