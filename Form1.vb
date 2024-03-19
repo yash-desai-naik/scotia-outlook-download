@@ -212,6 +212,11 @@ Public Class Form1
                             ElseIf fileName.Contains("DF_DEMINIMIS_EXTRACT") Then
                                 targetFolder = Path.Combine(targetFolder, "Supporting Files K2 and Murex", "Murex")
                                 EnsureCreation(targetFolder)
+                            ElseIf fileName.StartsWith("URUGUAY") AndAlso Path.GetExtension(fileName) = ".PDF" Then
+                                ' Save attachment to the "Uruguay" folder in the target folder
+                                Dim uruguayFolder As String = Path.Combine(targetFolder, "Uruguay")
+                                EnsureCreation(uruguayFolder)
+                                SaveAttachment(attachment, uruguayFolder)
                             End If
 
                             ' Save attachment to the target folder
