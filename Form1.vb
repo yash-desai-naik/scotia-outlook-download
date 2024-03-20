@@ -215,6 +215,9 @@ Public Class Form1
                             ElseIf fileName.StartsWith("URUGUAY") AndAlso Path.GetExtension(fileName) = ".PDF" Then
                                 ' Save attachment to the "Uruguay" folder in the target folder
                                 Dim uruguayFolder As String = Path.Combine(targetFolder, "Uruguay")
+                            ElseIf fileName.StartsWith("SCOTS") AndAlso Path.GetExtension(fileName) = ".PDF" Then
+                                ' Save attachment to the "Uruguay" folder in the target folder
+                                Dim uruguayFolder As String = Path.Combine(targetFolder, "SCOTS")
                                 EnsureCreation(uruguayFolder)
                                 SaveAttachment(attachment, uruguayFolder)
                             End If
